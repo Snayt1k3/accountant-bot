@@ -1,11 +1,13 @@
 import sqlite3
 from datetime import date
-from Keyboards import kb
+
 from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup
+
+from Keyboards import kb
 
 
 class Money(StatesGroup):
@@ -15,9 +17,9 @@ class Money(StatesGroup):
 
 async def cmd_start(message: types.Message):
     await Money.action.set()
-    kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("доход").add("расход")
-    await message.reply("Привет! Укажи действие кнопкой на клавиатуре", reply_markup=kb)
+    kb1 = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb1.add("доход").add("расход")
+    await message.reply("Привет! Укажи действие кнопкой на клавиатуре", reply_markup=kb1)
 
 
 # проверка Action
@@ -68,7 +70,8 @@ async def all_expenses(message: types.Message):
     period = "Month"
     await message.reply(f"Вот ваши траты за {period}")
 
-#Создания табл с id пользователя, если еще не таблица не создана
+
+# Создания табл с id пользователя, если еще не таблица не создана
 def connection(message: types.Message):
     db = sqlite3.connect("server.db")
     sql = db.cursor()
@@ -80,6 +83,7 @@ def connection(message: types.Message):
                  year INTEGER)""")
     db.commit()
     return db, sql
+
 
 # Взаимодействия с бд (запись данных)
 async def db_accountant(message, data):
