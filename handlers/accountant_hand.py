@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import date
-
+from Keyboards import kb
 from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
@@ -49,7 +49,7 @@ async def process_money(message: types.Message, state: FSMContext):
         data["money"] = int(message.text)
         await db_accountant(message, data)
 
-        await message.reply(f"Я учел ваш {data['action']}")
+        await message.reply(f"Я учел ваш {data['action']}", reply_markup=kb)
 
 
 # Добавляем возможность отмены, если пользователь передумал заполнять
@@ -68,7 +68,7 @@ async def all_expenses(message: types.Message):
     period = "Month"
     await message.reply(f"Вот ваши траты за {period}")
 
-
+#Создания табл с id пользователя, если еще не таблица не создана
 def connection(message: types.Message):
     db = sqlite3.connect("server.db")
     sql = db.cursor()
@@ -81,7 +81,7 @@ def connection(message: types.Message):
     db.commit()
     return db, sql
 
-
+# Взаимодействия с бд (запись данных)
 async def db_accountant(message, data):
     pillar = "income"
     if data["action"] is "расход":
