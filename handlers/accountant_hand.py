@@ -13,6 +13,7 @@ from Keyboards import kb
 class Money(StatesGroup):
     action = State()
     money = State()
+    day = State()
 
 
 async def cmd_start(message: types.Message):
@@ -24,7 +25,7 @@ async def cmd_start(message: types.Message):
 
 # проверка Action
 # @dp.message_handler(lambda message: message.text.lower() not in ["расход", "доход"], state=Money.action)
-async def process_age_invalid(message: types.Message):
+async def process_action_invalid(message: types.Message):
     return await message.reply("Напиши Действие или напиши /cancel")
 
 
@@ -44,15 +45,23 @@ async def process_money_invalid(message: types.Message):
     return await message.reply("Напиши Сумму или напиши /cancel")
 
 
-# Принимаем сумму
+# Принимаем сумму и узнаем день
 # @dp.message_handler(lambda message: message.text.isdigit(), state=Money.money)
 async def process_money(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data["money"] = int(message.text)
+    await message.reply("Напиши день (цифрой)")
+    await Money.next()
+
+
+# @dp.message_handler(state=Money.date)
+async def process_day(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        # print(f"day - {message.text}")
+        data["day"] = int(message.text)
         await db_accountant(message, data)
-
         await message.reply(f"Я учел ваш {data['action']}", reply_markup=kb)
-
+    await state.finish()
 
 # Добавляем возможность отмены, если пользователь передумал заполнять
 # @dp.message_handler(state='*', commands='cancel')
@@ -68,10 +77,18 @@ async def cancel_handler(message: types.Message, state: FSMContext):
 
 async def all_expenses(message: types.Message):
     period = "Month"
-    await message.reply(f"Вот ваши траты за {period}")
+    db, sql = connection(message)
+    sql.execute(f"""SELECT spent FROM '{message.from_user.id}' WHERE month={date.today().month}
+                """)
+    s = 0
+    for number in sql.fetchall():
+        if number[0]:
+            s += number[0]
+
+    await message.reply(f"Вот ваши траты за {period}\n{s}")
 
 
-# Создания табл с id пользователя, если еще не таблица не создана
+# Создания табл с id пользователя, если еще таблица не создана
 def connection(message: types.Message):
     db = sqlite3.connect("server.db")
     sql = db.cursor()
@@ -88,14 +105,14 @@ def connection(message: types.Message):
 # Взаимодействия с бд (запись данных)
 async def db_accountant(message, data):
     pillar = "income"
-    if data["action"] is "расход":
+    if data["action"] == "расход":
         pillar = "spent"
 
     today = date.today()
 
     db, sql = connection(message)
     sql.execute(f"""INSERT INTO '{message.from_user.id}' ({pillar}, year, month, day)
-                VALUES ({int(data["money"])}, {today.year}, {today.month}, {today.day})""")
+                VALUES ({int(data["money"])}, {today.year}, {today.month}, {data['day']})""")
 
     db.commit()
     # await message.reply(f"Я учел ваш {data['action']}")
@@ -104,9 +121,10 @@ async def db_accountant(message, data):
 def register_handlers(dp: Dispatcher):
     dp.register_message_handler(cmd_start, commands=["Внести_Расход_Доход"])
     dp.register_message_handler(all_expenses, commands=["Траты"])
-    dp.register_message_handler(process_age_invalid, lambda message: message.text.lower() not in ["расход", "доход"],
+    dp.register_message_handler(process_action_invalid, lambda message: message.text.lower() not in ["расход", "доход"],
                                 state=Money.action)
     dp.register_message_handler(process_action, state=Money.action)
     dp.register_message_handler(process_money_invalid, lambda message: not message.text.isdigit(), state=Money.money)
     dp.register_message_handler(process_money, lambda message: message.text.isdigit(), state=Money.money)
     dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), commands='cancel', state='*')
+    dp.register_message_handler(process_day, state=Money.day)
