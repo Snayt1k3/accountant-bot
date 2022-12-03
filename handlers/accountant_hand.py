@@ -6,7 +6,6 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup
-
 from Keyboards import kb
 
 
@@ -14,6 +13,7 @@ class Money(StatesGroup):
     action = State()
     money = State()
     day = State()
+    month = State()
 
 
 async def cmd_start(message: types.Message):
@@ -48,20 +48,30 @@ async def process_money_invalid(message: types.Message):
 # Принимаем сумму и узнаем день
 # @dp.message_handler(lambda message: message.text.isdigit(), state=Money.money)
 async def process_money(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data["money"] = int(message.text)
-    await message.reply("Напиши день (цифрой)")
+    await state.update_data(money=int(message.text))
+    await message.reply("Напиши день (цифрой) или .")
     await Money.next()
 
 
-# @dp.message_handler(state=Money.date)
+# @dp.message_handler(state=Money.day)
+# Принимаем день и узнаем месяц
 async def process_day(message: types.Message, state: FSMContext):
+    await state.update_data(day=message.text)
+    await message.reply(f"Введите номер месяца или точку\nПо умолчанию будет выставлен {date.today().month}")
+
+    await Money.next()
+
+
+# @dp.message_handler(state=Money.month)
+# Принимаем месяц
+async def process_month(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        # print(f"day - {message.text}")
-        data["day"] = int(message.text)
+        data["month"] = message.text
         await db_accountant(message, data)
-        await message.reply(f"Я учел ваш {data['action']}", reply_markup=kb)
+        await message.reply(f"Я учел ваш {data['action'].capitalize()}", reply_markup=kb)
+
     await state.finish()
+
 
 # Добавляем возможность отмены, если пользователь передумал заполнять
 # @dp.message_handler(state='*', commands='cancel')
@@ -109,10 +119,18 @@ async def db_accountant(message, data):
         pillar = "spent"
 
     today = date.today()
+    day = today.day
+    month = today.month
+
+    if data['day'].isdigit():
+        day = data['day']
+
+    if data['month'].isdigit():
+        month = data['month']
 
     db, sql = connection(message)
     sql.execute(f"""INSERT INTO '{message.from_user.id}' ({pillar}, year, month, day)
-                VALUES ({int(data["money"])}, {today.year}, {today.month}, {data['day']})""")
+                VALUES ({int(data["money"])}, {today.year}, {month}, {day})""")
 
     db.commit()
     # await message.reply(f"Я учел ваш {data['action']}")
@@ -128,3 +146,4 @@ def register_handlers(dp: Dispatcher):
     dp.register_message_handler(process_money, lambda message: message.text.isdigit(), state=Money.money)
     dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), commands='cancel', state='*')
     dp.register_message_handler(process_day, state=Money.day)
+    dp.register_message_handler(process_month, state=Money.month)
