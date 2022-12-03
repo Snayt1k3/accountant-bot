@@ -1,9 +1,11 @@
 import logging
-from Keyboards import kb
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
+
+from Keyboards import kb
 from cfg import token
-from handlers import accountant_hand
+from handlers import accountant_hand, expenses
 
 API_TOKEN = token
 
@@ -16,6 +18,7 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot, storage=storage)
 
 accountant_hand.register_handlers(dp)
+expenses.register_handlers(dp)
 
 
 @dp.message_handler(commands=['start', 'help'])

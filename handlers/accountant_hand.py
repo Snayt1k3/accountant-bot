@@ -6,6 +6,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup
+
 from Keyboards import kb
 
 
@@ -85,19 +86,6 @@ async def cancel_handler(message: types.Message, state: FSMContext):
     await message.reply('ОК')
 
 
-async def all_expenses(message: types.Message):
-    period = "Month"
-    db, sql = connection(message)
-    sql.execute(f"""SELECT spent FROM '{message.from_user.id}' WHERE month={date.today().month}
-                """)
-    s = 0
-    for number in sql.fetchall():
-        if number[0]:
-            s += number[0]
-
-    await message.reply(f"Вот ваши траты за {period}\n{s}")
-
-
 # Создания табл с id пользователя, если еще таблица не создана
 def connection(message: types.Message):
     db = sqlite3.connect("server.db")
@@ -138,7 +126,6 @@ async def db_accountant(message, data):
 
 def register_handlers(dp: Dispatcher):
     dp.register_message_handler(cmd_start, commands=["Внести_Расход_Доход"])
-    dp.register_message_handler(all_expenses, commands=["Траты"])
     dp.register_message_handler(process_action_invalid, lambda message: message.text.lower() not in ["расход", "доход"],
                                 state=Money.action)
     dp.register_message_handler(process_action, state=Money.action)
