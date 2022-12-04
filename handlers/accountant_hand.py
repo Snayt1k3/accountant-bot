@@ -20,14 +20,20 @@ class Money(StatesGroup):
 async def cmd_start(message: types.Message):
     await Money.action.set()
     kb1 = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb1.add("доход").add("расход")
+    kb1.add("доход").add("расход").add('отмена')
     await message.reply("Привет! Укажи действие кнопкой на клавиатуре", reply_markup=kb1)
 
 
-# проверка Action
-# @dp.message_handler(lambda message: message.text.lower() not in ["расход", "доход"], state=Money.action)
-async def process_action_invalid(message: types.Message):
-    return await message.reply("Напиши Действие или напиши /cancel")
+# Добавляем возможность отмены, если пользователь передумал заполнять
+# @dp.message_handler(state='*', commands='отмена')
+# @dp.message_handler(Text(equals='отмена', ignore_case=True), state='*')
+async def cancel_handler(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is None:
+        return
+
+    await state.finish()
+    await message.reply('ОК', reply_markup=kb)
 
 
 # Принимаем Action и узнаем сумму
@@ -40,17 +46,13 @@ async def process_action(message: types.Message, state: FSMContext):
     await message.reply("Введи Сумму")
 
 
-# Проверка суммы
-# @dp.message_handler(lambda message: not message.text.isdigit(), state=Money.money)
-async def process_money_invalid(message: types.Message):
-    return await message.reply("Напиши Сумму или напиши /cancel")
-
-
 # Принимаем сумму и узнаем день
 # @dp.message_handler(lambda message: message.text.isdigit(), state=Money.money)
 async def process_money(message: types.Message, state: FSMContext):
-    await state.update_data(money=int(message.text))
-    await message.reply("Напиши день (цифрой) или .")
+    await state.update_data(money=message.text)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(".").add("отмена")
+    await message.reply("Напиши день (цифрой) или .", reply_markup=keyboard)
     await Money.next()
 
 
@@ -58,7 +60,10 @@ async def process_money(message: types.Message, state: FSMContext):
 # Принимаем день и узнаем месяц
 async def process_day(message: types.Message, state: FSMContext):
     await state.update_data(day=message.text)
-    await message.reply(f"Введите номер месяца или точку\nПо умолчанию будет выставлен {date.today().month}")
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(".").add("отмена")
+    await message.reply(f"Введите номер месяца или .\nПо умолчанию будет выставлен {date.today().month}",
+                        reply_markup=keyboard)
 
     await Money.next()
 
@@ -68,22 +73,13 @@ async def process_day(message: types.Message, state: FSMContext):
 async def process_month(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data["month"] = message.text
+        # if data["action"] not in ["доход", "расход"] or not (data['day'].isdigit()) or not (data['month'].isdigit()):
+        #     await message.reply("Вы указали Что-то неправильно", reply_markup=kb)
+        # else:
         await db_accountant(message, data)
         await message.reply(f"Я учел ваш {data['action'].capitalize()}", reply_markup=kb)
 
     await state.finish()
-
-
-# Добавляем возможность отмены, если пользователь передумал заполнять
-# @dp.message_handler(state='*', commands='cancel')
-# @dp.message_handler(Text(equals='отмена', ignore_case=True), state='*')
-async def cancel_handler(message: types.Message, state: FSMContext):
-    current_state = await state.get_state()
-    if current_state is None:
-        return
-
-    await state.finish()
-    await message.reply('ОК')
 
 
 # Создания табл с id пользователя, если еще таблица не создана
@@ -126,11 +122,9 @@ async def db_accountant(message, data):
 
 def register_handlers(dp: Dispatcher):
     dp.register_message_handler(cmd_start, commands=["Внести_Расход_Доход"])
-    dp.register_message_handler(process_action_invalid, lambda message: message.text.lower() not in ["расход", "доход"],
-                                state=Money.action)
+    dp.register_message_handler(cancel_handler, commands='отмена', state='*')
+    dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), state='*')
     dp.register_message_handler(process_action, state=Money.action)
-    dp.register_message_handler(process_money_invalid, lambda message: not message.text.isdigit(), state=Money.money)
     dp.register_message_handler(process_money, lambda message: message.text.isdigit(), state=Money.money)
-    dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), commands='cancel', state='*')
     dp.register_message_handler(process_day, state=Money.day)
     dp.register_message_handler(process_month, state=Money.month)
