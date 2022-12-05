@@ -9,6 +9,19 @@ from aiogram.types import ReplyKeyboardMarkup
 
 from Keyboards import kb
 
+dict_nums_to_string = {
+    1: "Первый", 6: "Шестой", 11: "Одинадцатый", 16: "Шестнадцатый", 21: "Двадцать Первый", 26: "Двадцать Шестой",
+    2: "Второй", 7: "Седьмой", 12: "Двенадцатый", 17: "Семнадцатый", 22: "Двадцать Второй", 27: "Двадцать Седьмой",
+    31: "Тридцать Первый",
+    3: "Третий", 8: "Восьмой", 13: "Тринадцатый", 18: "Восемнадцатый", 23: "Двадцать Третий", 28: "Двадцать Восьмой",
+    4: "Четвертый", 9: "Девятый", 14: "Четырнадцатый", 19: "Девятнадцатый", 24: "Двадцать Четвертое",
+    29: "Двадцать Девятое",
+    5: "Пятый", 10: "Десятый", 15: "Пятнадцатый", 20: "Двадцатый", 25: "Двадцать Пятое", 30: "Тридцатое",
+
+}
+
+db_name = "server.db"
+
 
 class Date(StatesGroup):
     day = State()
@@ -20,7 +33,7 @@ async def start_fsm_expenses(message: types.Message):
     kb.add(".")
 
     await Date.day.set()
-    await message.reply("Напиши в какой день, хочешь увидеть свои траты\nили укажи точку", reply_markup=kb)
+    await message.reply("Напиши в какой день, хочешь увидеть свои траты\nили укажи .", reply_markup=kb)
 
 
 # Принимаем День
@@ -64,7 +77,7 @@ async def all_expenses(message: types.Message, data):
     elif 'month' in period:
         res = f"WHERE month={period['month']}"
 
-    db = sqlite3.connect("server.db")
+    db = sqlite3.connect(db_name)
     sql = db.cursor()
     sql.execute(f"""SELECT spent FROM '{message.from_user.id}' {res}
                 """)
@@ -76,11 +89,12 @@ async def all_expenses(message: types.Message, data):
     str_res = f"Вот ваши траты за {date.today().month}\n{s}"
 
     if month and day:
-        str_res = f"Вот ваши траты за {month} Месяц и {day} День\n{s}"
+        str_res = f"Вот Ваши Траты за {dict_nums_to_string[int(month)]} Месяц и {dict_nums_to_string[int(day)]} " \
+                  f"День Этого Месяца \n{s}"
     elif month:
-        str_res = f"Вот ваши траты за {month} Месяц\n{s}"
+        str_res = f"Вот Ваши Траты за {dict_nums_to_string[int(month)]} Месяц\n{s}"
     elif day:
-        str_res = f"Вот ваши траты за {day} День\n{s}"
+        str_res = f"Вот Ваши Траты за {dict_nums_to_string[int(day)]} День\n{s}"
 
     return str_res
 

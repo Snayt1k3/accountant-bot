@@ -9,6 +9,8 @@ from aiogram.types import ReplyKeyboardMarkup
 
 from Keyboards import kb
 
+db_name = "server.db"
+
 
 class Money(StatesGroup):
     action = State()
@@ -73,9 +75,6 @@ async def process_day(message: types.Message, state: FSMContext):
 async def process_month(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data["month"] = message.text
-        # if data["action"] not in ["доход", "расход"] or not (data['day'].isdigit()) or not (data['month'].isdigit()):
-        #     await message.reply("Вы указали Что-то неправильно", reply_markup=kb)
-        # else:
         await db_accountant(message, data)
         await message.reply(f"Я учел ваш {data['action'].capitalize()}", reply_markup=kb)
 
@@ -84,7 +83,7 @@ async def process_month(message: types.Message, state: FSMContext):
 
 # Создания табл с id пользователя, если еще таблица не создана
 def connection(message: types.Message):
-    db = sqlite3.connect("server.db")
+    db = sqlite3.connect(db_name)
     sql = db.cursor()
     sql.execute(f"""CREATE TABLE IF NOT EXISTS '{message.from_user.id}'(
                  income BIGINT NULL,
